@@ -1,4 +1,4 @@
---@metatablecatmaid
+--written by @metatablecatmaid
 
 --[[
 	Reading process:

@@ -181,7 +181,7 @@ return function(widget:DockWidgetPluginGui)
 			local t = Instance.new('ModuleScript', workspace)
 			t.Name = 'lrc4-ld-export-temp'
 			t.Source = 
-[[--|LRC|4.4.1|LD|JSON
+[[--|LRC|4.4.3|LD|JSON
 
 --<<BEGIN>>--
 ]]

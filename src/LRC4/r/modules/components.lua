@@ -30,6 +30,8 @@ return function(widget:DockWidgetPluginGui)
 					end)
 
 					while task.wait() do
+						if not v or not v.m or not v.m.bar then break end
+						
 						ts:Create(v.m.bar, TweenInfo.new(0.6, Enum.EasingStyle.Linear), {BackgroundTransparency = 0}):Play()
 						task.wait(.6)
 						ts:Create(v.m.bar, TweenInfo.new(0.6, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.25}):Play()

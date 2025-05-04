@@ -10,6 +10,7 @@ local is = game:GetService('InsertService')
 local debris = game:GetService('Debris')
 local mps = game:GetService('MarketplaceService')
 local ss = game:GetService('StudioService')
+local content = game:GetService('ContentProvider')
 
 local user_id = game:GetService("StudioService"):GetUserId()
 
@@ -79,6 +80,7 @@ local configs = {
 	viewport_active_rig = nil;
 	is_local = false;
 	local_req_info = {cai={};humanoid_desc={};};
+	overwrite_3d_preview_pref = false;
 }
 
 local cache = {
@@ -125,43 +127,76 @@ local function upd_viewport_model_async(widget:DockWidgetPluginGui)
 	
 	if configs.viewport_active_rig then
 		configs.viewport_active_rig:Destroy()
+		configs.viewport_active_rig = nil
 	end
 	
+	
 	local rig = r.rigs[(configs.rig_type == "R6" or configs.rig_type == "R15") and configs.rig_type or "R6"]:Clone()
+	--if configs.rig_type == 'R15' then rig = r.rigs.R15_low:Clone() end
 	rig.Archivable = false
-	local vs, verr = pcall(function()
-		local rig_humanoid:Humanoid = rig:WaitForChild("Humanoid")
+	
+	local vs, verr
+	
+	if not configs.overwrite_3d_preview_pref and use_viewport_by_default() ~= true then
+		vs, verr = true, nil
+	else
+		vs, verr = pcall(function()
+			local rig_humanoid:Humanoid = rig:WaitForChild("Humanoid")
 
-		rig.Parent = workspace
-		rig.HumanoidRootPart.CFrame = CFrame.new(1e9,1e9,1e9)
-		rig.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
-		
-		for _, v in pairs(rig:GetDescendants()) do
-			if v:IsA(string.reverse('D6rotoM')) then
-				v.Archivable = false
-				v:Destroy()
+			rig.Parent = workspace
+			rig.HumanoidRootPart.CFrame = CFrame.new(1e9,1e9,1e9)
+			
+			--rig.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+			
+			for _, v in pairs(rig:GetDescendants()) do
+				if v:IsA(string.reverse('D6rotoM')) then
+					v.Archivable = false
+					v:Destroy()
+				end
 			end
-		end
-		
-		local desc
-		
-		if configs.local_req_info and configs.local_req_info.humanoid_desc and typeof(configs.local_req_info.humanoid_desc) == 'Instance' and configs.local_req_info.humanoid_desc:IsA('HumanoidDescription') then desc = configs.local_req_info.humanoid_desc else
-			if configs.outfit_id ~= 0 then
-				desc = players:GetHumanoidDescriptionFromOutfitId(configs.outfit_id)
-			else
-				desc = players:GetHumanoidDescriptionFromUserId(configs.uid)
+			
+			
+			local desc
+			
+			if configs.local_req_info and configs.local_req_info.humanoid_desc and typeof(configs.local_req_info.humanoid_desc) == 'Instance' and configs.local_req_info.humanoid_desc:IsA('HumanoidDescription') then desc = configs.local_req_info.humanoid_desc else
+				if configs.outfit_id ~= 0 then
+					desc = players:GetHumanoidDescriptionFromOutfitId(configs.outfit_id)
+				else
+					desc = players:GetHumanoidDescriptionFromUserId(configs.uid)
+				end
 			end
-		end
+			
+			if desc and typeof(desc) == 'Instance' then
+				content:PreloadAsync({desc})
+			end
+			
+			rig_humanoid:ApplyDescription(desc)
+			rig.HumanoidRootPart.CFrame = CFrame.new(304.777527, 9.99545383, -303.347107, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+			
 		
-		rig_humanoid:ApplyDescription(desc)
-		rig.HumanoidRootPart.CFrame = CFrame.new(304.777527, 9.99545383, -303.347107, 1, 0, 0, 0, 1, 0, 0, 0, 1)
-		rig.Parent = app.loader.view.contain_view.viewport_padding.viewport.wm
-		rig:PivotTo(CFrame.new(0,0,0))
-		rig.HumanoidRootPart.CFrame = CFrame.new(0,0,0)
-		configs.viewport_active_rig = rig
-	end)
+			------ reduce load on lower-performance devices by removing instances that normally dont affect the appearance while in the viewport (barely helps)
+			
+			--for _, v in pairs(rig:GetDescendants()) do
+			--	if v and v:IsA('Attachment') or v:IsA('Vector3Value') or v:IsA('Weld') then
+			--		v:Destroy()
+			--	end
+			--end
+			
+			-- nvm
+			
+			
+			--task.wait()
+			
+			rig.Parent = app.loader.view.contain_view.viewport_padding.viewport.wm -- apparently a death sentence for low-end devices now, great job roblox :+1:
+			rig:PivotTo(CFrame.new())
+			rig.HumanoidRootPart.CFrame = CFrame.new()
+			configs.viewport_active_rig = rig
+		end)		
+	end
+	
 
 	if not vs then
+		
 		app.loader.view.contain_view.viewport_padding.viewport.Visible = false
 		app.loader.view.contain_view.viewport_padding.fallback.Visible = true
 		app.loader.view.contain_view.viewport_padding.preload.Visible = false
@@ -173,7 +208,7 @@ local function upd_viewport_model_async(widget:DockWidgetPluginGui)
 		debris:AddItem(rig, 0)
 		notifs:banner(widget, 'An error occured when loading the 3D Preview', 'error', 3)
 	else
-		if use_viewport_by_default() ~= true then
+		if not configs.overwrite_3d_preview_pref and use_viewport_by_default() ~= true then
 			app.loader.view.contain_view.viewport_padding.viewport.Visible = false
 			app.loader.view.contain_view.viewport_padding.preload.Visible = false
 			app.loader.view.contain_view.viewport_padding.fallback.Visible = true
@@ -669,6 +704,7 @@ function loader:init(widget:DockWidgetPluginGui)
 			if configs.animation_applied then app.loader.main.content.top_buttons.animations.crc.Visible = true end
 			
 			upd_viewport_model_async(widget)
+			
 			if configs.rig_type ~= configs.origin_rig_type then app.loader.view.contain_view.viewport_padding.rig_type_mismatch_warning.Visible = true else app.loader.view.contain_view.viewport_padding.rig_type_mismatch_warning.Visible = false end
 		end
 	end)
@@ -1434,13 +1470,23 @@ function loader:init(widget:DockWidgetPluginGui)
 	end
 	
 	local function toggle_3d()
+		
 		if app.loader.view.contain_view.viewport_padding.viewport.Visible then
+			configs.overwrite_3d_preview_pref = false
 			app.loader.view.contain_view.viewport_padding.viewport.Visible = false
 			app.loader.view.contain_view.viewport_padding.fallback.Visible = true
 			app.loader.view.contain_view.viewport_padding.viewutil['3dtoggle'].button.ImageTransparency = 0.4
 			app.loader.view.contain_view.viewport_padding.viewutil['3dtoggle'].button.Image = 'http://www.roblox.com/asset/?id=92043778278910'
 		else
-			if not configs.viewport_active_rig then notifs:banner(widget, 'A 3D preview is not available right now for this character', 'warning') return end
+			configs.overwrite_3d_preview_pref = true
+			app.loader.view.contain_view.viewport_padding.preload.Visible = true
+			app.loader.view.contain_view.viewport_padding.fallback.Visible = false
+			app.loader.view.contain_view.viewport_padding.viewport.Visible = false
+			if not configs.viewport_active_rig then upd_viewport_model_async(widget) end
+			if not configs.viewport_active_rig then notifs:banner(widget, 'A 3D preview is not available right now for this character', 'warning')
+				app.loader.view.contain_view.viewport_padding.preload.Visible = false
+				app.loader.view.contain_view.viewport_padding.fallback.Visible = true
+			return end
 			app.loader.view.contain_view.viewport_padding.viewport.Visible = true
 			app.loader.view.contain_view.viewport_padding.fallback.Visible = false
 			app.loader.view.contain_view.viewport_padding.viewutil['3dtoggle'].button.ImageTransparency = 0
@@ -1574,6 +1620,7 @@ function loader:open(widget:DockWidgetPluginGui, uid, usi, __disable_automatic_f
 		configs.local_req_info.humanoid_desc = {}
 		configs.local_req_info.cai = {}
 		configs.is_local = false
+		configs.overwrite_3d_preview_pref = false
 		
 		if info and info.is_local then
 			configs.is_local = true
@@ -1721,7 +1768,9 @@ function loader:open(widget:DockWidgetPluginGui, uid, usi, __disable_automatic_f
 			end
 		end
 
+		
 		upd_viewport_model_async(widget)
+		
 		-- roblos
 		--app.loader.view.contain_view.viewport_padding.viewport.Visible = false
 		--app.loader.view.contain_view.viewport_padding.fallback.Visible = true

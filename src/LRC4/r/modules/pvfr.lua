@@ -5,12 +5,15 @@ local rs = game:GetService("RunService")
 local distance = 10
 local fov = 50
 local pitch_angle = 0
-local speed = 50
+--local speed = 50
+local speed = 1
 local should = true
 
 local frame_start = os.clock()
 local frame = 0
 local framediv = 1/60
+
+local base_offset = Vector3.new(0,0,distance)
 
 local mouse:PluginMouse = script.Parent.Parent.connect.plugin_gateway:Invoke('get', 'mouse')
 
@@ -88,16 +91,26 @@ function pvfr:enable(vpf:ViewportFrame, target:Model, widget:DockWidgetPluginGui
 		--	----mouse.
 		--end
 		
-		local conn
-		conn = rs.PostSimulation:Connect(function(delta)
-			if os.clock() - frame_start < 1 / 60 then return end
-			frame_start = os.clock()
+		--local conn
+		--conn = rs.PostSimulation:Connect(function(delta)
+		--	if os.clock() - frame_start < 1 / 60 then return end
+		--	frame_start = os.clock()
 			
-			if not target or not target.Parent then conn:Disconnect(); wheel_forward:Disconnect(); wheel_backward:Disconnect(); --[[if bdown then is_down = false bdown:Disconnect() end; if bup then bup:Disconnect() end; if bmove then bmove:Disconnect() end if bleave then bleave:Disconnect() end]] end
-			if widget then if not widget.app.loader.Visible or not widget.Enabled or not should or not vpf.Visible or is_down then return end end
-			t += delta
+		--	if not target or not target.Parent then conn:Disconnect(); wheel_forward:Disconnect(); wheel_backward:Disconnect(); --[[if bdown then is_down = false bdown:Disconnect() end; if bup then bup:Disconnect() end; if bmove then bmove:Disconnect() end if bleave then bleave:Disconnect() end]] end
+		--	if widget then if not widget.app.loader.Visible or not widget.Enabled or not should or not vpf.Visible or is_down then return end end
+		--	t += delta
 			
-			vpc.CFrame = CFrame.Angles(0, math.rad(t * speed), 0) * CFrame.new(0, 0, distance)
+		--	vpc.CFrame = CFrame.Angles(0, math.rad(t * speed), 0) * CFrame.new(0, 0, distance)
+		--end)
+		
+		rs:BindToRenderStep('lrc4__viewport_auto_rotate', Enum.RenderPriority.Camera.Value, function(dt)
+			if not target or not target.Parent then rs:UnbindFromRenderStep('lrc4__viewport_auto_rotate'); wheel_forward:Disconnect(); wheel_backward:Disconnect(); return end
+			if not should or not vpf.Visible or is_down then return end
+			t = (t + dt) % (2 * math.pi)
+			
+			--vpc.CFrame = CFrame.Angles(0, math.rad(t * speed), 0) * CFrame.new(0, 0, distance)
+			local rot = CFrame.Angles(0, t * speed, 0)
+			vpc.CFrame = rot + rot:VectorToWorldSpace(base_offset)
 		end)
 	else
 		warn("LRC4 | Rig not found in viewport frame")
